@@ -1,0 +1,70 @@
+\import Data.List
+\import Paths
+
+\func swap {A : \Type} (v : List A) (a b : Nat) : List A \elim v
+  | nil => nil
+  | :: x v =>
+    \case a, b \with {
+      | 0, 0 => x :: v
+      | suc a, 0 => doSwap x v a
+      | 0, suc b => doSwap x v b
+      | suc a, suc b => x :: (swap v a b)
+    }
+  \where {
+    \func doSwap {A : \Type} (x : A) (v : List A) (ind : Nat) : List A =>
+      \let | (f, g) => splitAt ind v
+      \in
+        \case g \with {
+          | nil => x :: v
+          | :: y g => y :: (f ++ (x :: g))
+        }
+  }
+
+\func trans {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
+  => transport (\lam x => a = x) q p
+
+\func sigma {A B : \Type} {a a' : A} {b b' : B} (p : a = a') (q : b = b') : (a, b) = (a', b') =>
+  pmap2 (\lam x y => (x, y)) p q
+
+\func proof : \Pi {A : \Type} (v : List A) (a b : Nat) -> swap v a b = swap v b a =>
+  \lam v a b => proof' v a b
+    \where {
+      \open swap(doSwap)
+      \func proof' {A : \Type} (v : List A) (a b : Nat) : swap v a b = swap v b a \elim v
+        | nil => trans (lemma1 nil a b idp) (inv (lemma1 nil b a idp))
+        | :: x w => \let | v => (x :: w) \in
+          \case a \as aa, idp : a = aa, b \as bb, idp : b = bb \with {
+            | 0, r, 0, s => pmap2 (\lam a' b' => swap v a' b') (trans r (inv s)) (trans s (inv r))
+            | suc aa, r, 0, s =>
+              trans {List A} {swap v a b} {doSwap x w aa} {swap v b a}
+                  (lemma3 v x w a b aa idp r s)
+                  (inv {List A} {swap v b a} {doSwap x w aa} (lemma2 v x w b a aa idp s r))
+            | 0, r, suc bb, s =>
+              trans {List A} {swap v a b} {doSwap x w bb} {swap v b a}
+                  (lemma2 v x w a b bb idp r s)
+                  (inv {List A} {swap v b a} {doSwap x w bb} (lemma3 v x w b a bb idp s r))
+            | suc aa, r, suc bb, s =>
+              swap v a b ==< lemma4 v x w a b aa bb idp r s >==
+              x :: (swap w aa bb) ==< pmap (\lam l => x :: l) (proof' w aa bb) >==
+              x :: (swap w bb aa) ==< inv (lemma4 v x w b a bb aa idp s r) >==
+              swap v b a `qed
+          }
+      \func lemma1 : \Pi {A : \Type} (v : List A) (a b : Nat) (p : v = nil)
+      -> swap v a b = nil =>
+        \lam v a b p => pmap (\lam w => swap w a b) p
+
+      \func lemma2 : \Pi {A : \Type} (v : List A) (x : A) (w : List A) (a b : Nat) (bb : Nat)
+                         (q : v = x :: w) (r : a = 0) (s : b = suc bb)
+      -> swap v a b = doSwap x w bb =>
+        \lam v x w a b bb q r s => pmap2 (\lam v' ab => swap v' ab.1 ab.2) q (sigma r s)
+
+      \func lemma3 : \Pi {A : \Type} (v : List A) (x : A) (w : List A) (a b : Nat) (aa : Nat)
+                         (q : v = x :: w) (r : a = suc aa) (s : b = 0)
+      -> swap v a b = doSwap x w aa =>
+        \lam v x w a b aa q r s => pmap2 (\lam v' ab => swap v' ab.1 ab.2) q (sigma r s)
+
+      \func lemma4 : \Pi {A : \Type} (v : List A) (x : A) (w : List A) (a b : Nat) (aa : Nat) (bb : Nat)
+                         (q : v = x :: w) (r : a = suc aa) (s : b = suc bb)
+      -> swap v a b = x :: (swap w aa bb) =>
+        \lam v x w a b aa bb q r s => pmap2 (\lam v' ab => swap v' ab.1 ab.2) q (sigma r s)
+    }

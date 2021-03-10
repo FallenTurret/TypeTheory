@@ -1,0 +1,63 @@
+\import Algebra.Domain.Euclidean
+\import Arith.Nat
+\import Logic
+\import Paths
+\open Nat(mod,div,+,*,<=)
+\open EuclideanSemiringData(gcd)
+
+\func euclid (a b : Nat) : \Sigma Nat Nat => euclid' b a b
+  \where
+    \func euclid' (b' a b : Nat) : \Sigma Nat Nat \elim b'
+      | 0 => (a, 0)
+      | suc b' =>
+        \case b \with {
+          | 0 => (a, 0)
+          | b => euclid' b' b (a mod b)
+        }
+
+\func trans {A : \Type} {a a' a'' : A} (p : a = a') (q : a' = a'') : a = a''
+  => transport (\lam x => a = x) q p
+
+\func from=to<= {x y : Nat} (p : x = y) : x <= y \elim x, y
+  | 0, 0 => NatLE.<=-reflexive
+  | 0, suc y => suc/=0 (inv p)
+  | suc x, 0 => suc/=0 p
+  | suc x, suc y => <=_+ (from=to<= (pmap pred p)) (NatLE.<=-reflexive {1})
+
+\func proof : \Pi (a b : Nat) -> euclid a b = (gcd a b, 0) =>
+  \lam a b => proof' b a b NatLE.<=-reflexive
+  \where {
+    \open euclid(euclid')
+    \func proof' (b' a b : Nat) (p : b <= b') : euclid' b' a b = (gcd a b, 0) \elim b'
+      | 0 => pmap (\lam x => (gcd a x, 0)) (NatLE.<=-antisymmetric (<=_0_+-left b) p)
+      | suc b' =>
+        \case b \as d, idp : b = d \with {
+          | 0, q =>
+            euclid' (suc b') a b ==< pmap (\lam x => euclid' (suc b') a x) q >==
+            euclid' (suc b') a 0 ==< idp >==
+            (a, 0) ==< pmap (\lam x => (gcd a x, 0)) (inv q) >==
+            (gcd a b, 0) `qed
+          | suc bb, q =>
+            euclid' (suc b') a b
+              ==< pmap (\lam x => euclid' (suc b') a x) q >==
+            euclid' b' (suc bb) (a mod (suc bb))
+              ==<
+                proof' b' (suc bb) (a mod (suc bb)) (
+                  NatLE.<=-transitive
+                      (NatLE.unsuc (mod<right (\lam =0 => suc/=0 =0)))
+                      (NatLE.unsuc (NatLE.<=-transitive (from=to<= (inv q)) p))
+                  )
+              >==
+            (gcd (suc bb) (a mod (suc bb)), 0)
+              ==< pmap (\lam x => (gcd x (a mod x), 0)) (inv q) >==
+            (gcd b (a mod b), 0)
+              ==< pmap (\lam x => (x, 0)) (nat_gcd-comm b (a mod b)) >==
+            (gcd (a mod b) b, 0)
+              ==< pmap (\lam x => (x, 0)) (inv (nat_gcd_sum (a mod b) b (a div b))) >==
+            (gcd ((a mod b) + b * (a div b)) b, 0)
+              ==< pmap (\lam x => (gcd x b, 0)) (NatSemiring.+-comm {(a mod b)} {b * (a div b)}) >==
+            (gcd (b * (a div b) + (a mod b)) b, 0)
+              ==< pmap (\lam x => (gcd x b, 0)) (NatEuclidean.isDivMod a b) >==
+            (gcd a b, 0) `qed
+        }
+  }
